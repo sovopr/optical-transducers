@@ -46,9 +46,11 @@ def build_system(params: dict):
     c_ops = [
         np.sqrt(k_a) * a,                          # microwave photon loss
         np.sqrt(g_b * (1 + n_th)) * b,              # mechanical phonon loss (stimulated + spontaneous)
-        np.sqrt(g_b * n_th) * b.dag(),               # thermal phonon absorption from bath
         np.sqrt(k_c) * c,                           # optical photon loss
     ]
+    # Only add thermal absorption operator if n_th > 0
+    if n_th > 0:
+        c_ops.append(np.sqrt(g_b * n_th) * b.dag())
 
     return N, a, b, c, H, c_ops
 
@@ -96,7 +98,21 @@ class WignerParams(BaseModel):
     gammaB: float
     kappaC: float
     nThermal: float = 0.0
-    timeIndex: Optional[int] = None  # if None, use time of max optical population
+    timeIndex: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Helper: run mesolve and return states (no e_ops so states are stored)
+# ---------------------------------------------------------------------------
+
+def run_mesolve_with_states(H, psi0, tlist, c_ops):
+    """Run mesolve with store_states=True so QuTiP stores full density matrices."""
+    return qt.mesolve(H, psi0, tlist, c_ops=c_ops, options={'store_states': True})
+
+
+def expect_from_states(states, op):
+    """Compute expectation values from stored states."""
+    return np.array([qt.expect(op, s) for s in states])
 
 
 # ---------------------------------------------------------------------------
@@ -111,24 +127,25 @@ def simulate(params: SimParams):
     tlist = np.linspace(0, 10, 200)
     e_ops = [a.dag() * a, b.dag() * b, c.dag() * c]
 
+    # Monte Carlo for the trajectory plot
     result = qt.mcsolve(H, psi0, tlist, c_ops=c_ops, e_ops=e_ops, ntraj=params.ntraj)
 
     n_a = result.expect[0]
     n_b = result.expect[1]
     n_c = result.expect[2]
 
-    # --- Compute quantum metrics ---
-    # For fidelity and added noise, run a single mesolve pass (density matrix)
-    result_dm = qt.mesolve(H, psi0, tlist, c_ops=c_ops, e_ops=[])
+    # --- Compute quantum metrics via mesolve (stores states) ---
+    result_dm = run_mesolve_with_states(H, psi0, tlist, c_ops)
+    n_c_dm = expect_from_states(result_dm.states, c.dag() * c)
 
     # Find time of max optical population
-    peak_idx = int(np.argmax(n_c))
+    peak_idx = int(np.argmax(n_c_dm))
     rho_peak = result_dm.states[peak_idx]
 
     # Reduced density matrix of optical cavity at peak transfer time
     rho_c = rho_peak.ptrace(2)
 
-    # Fidelity: overlap with |1⟩ Fock state in the optical cavity
+    # Fidelity: overlap with |1> Fock state in the optical cavity
     target = qt.basis(N, 1)
     fidelity = float(qt.expect(target * target.dag(), rho_c))
 
@@ -138,7 +155,7 @@ def simulate(params: SimParams):
     n_add = float(np.max(result_vac.expect[0]))
 
     # Max conversion efficiency
-    max_eff = float(np.max(n_c))
+    max_eff = float(np.max(n_c_dm))
 
     data = []
     for i, t in enumerate(tlist):
@@ -171,13 +188,17 @@ def wigner(params: WignerParams):
     psi0 = qt.tensor(qt.basis(N, 1), qt.basis(N, 0), qt.basis(N, 0))
     tlist = np.linspace(0, 10, 200)
 
-    result = qt.mesolve(H, psi0, tlist, c_ops=c_ops, e_ops=[c.dag() * c])
+    # Run WITHOUT e_ops so states are stored
+    result = run_mesolve_with_states(H, psi0, tlist, c_ops)
+
+    # Compute optical population from states to find peak
+    n_c_vals = expect_from_states(result.states, c.dag() * c)
 
     # Pick the time index
     if params.timeIndex is not None:
         idx = min(params.timeIndex, len(tlist) - 1)
     else:
-        idx = int(np.argmax(result.expect[0]))
+        idx = int(np.argmax(n_c_vals))
 
     rho_full = result.states[idx]
     rho_c = rho_full.ptrace(2)  # reduced optical density matrix
@@ -223,25 +244,27 @@ def sweep(params: SweepParams):
     c_ops_base = [
         np.sqrt(k_a) * a_op,
         np.sqrt(g_b * (1 + n_th)) * b_op,
-        np.sqrt(g_b * n_th) * b_op.dag(),
         np.sqrt(k_c) * c_op,
     ]
+    if n_th > 0:
+        c_ops_base.append(np.sqrt(g_b * n_th) * b_op.dag())
 
     results = []
     for gmc_val in gmc_values:
         g_mc = gmc_val * 2 * np.pi
         H = g_am * (a_op.dag() * b_op + a_op * b_op.dag()) + g_mc * (b_op.dag() * c_op + b_op * c_op.dag())
 
-        # Signal run
-        res = qt.mesolve(H, psi0, tlist, c_ops=c_ops_base, e_ops=[c_op.dag() * c_op])
-        max_eff = float(np.max(res.expect[0]))
+        # Run without e_ops to store states
+        res = run_mesolve_with_states(H, psi0, tlist, c_ops_base)
+        n_c_vals = expect_from_states(res.states, c_op.dag() * c_op)
+        max_eff = float(np.max(n_c_vals))
 
         # Fidelity at peak
-        peak_idx = int(np.argmax(res.expect[0]))
+        peak_idx = int(np.argmax(n_c_vals))
         rho_c = res.states[peak_idx].ptrace(2)
         fidelity = float(qt.expect(target * target.dag(), rho_c))
 
-        # Noise run (vacuum input)
+        # Noise run (vacuum input) — e_ops is fine here since we don't need states
         res_vac = qt.mesolve(H, psi0_vac, tlist, c_ops=c_ops_base, e_ops=[c_op.dag() * c_op])
         n_add = float(np.max(res_vac.expect[0]))
 
@@ -288,27 +311,27 @@ def backaction(params: BackactionParams):
         c_ops = [
             np.sqrt(k_a) * a_op,
             np.sqrt(g_b * (1 + n_th)) * b_op,
-            np.sqrt(g_b * n_th) * b_op.dag(),
             np.sqrt(k_c) * c_op,
         ]
+        if n_th > 0:
+            c_ops.append(np.sqrt(g_b * n_th) * b_op.dag())
 
-        # Signal
-        res = qt.mesolve(H, psi0, tlist, c_ops=c_ops, e_ops=[c_op.dag() * c_op, a_op.dag() * a_op])
-        max_eff = float(np.max(res.expect[0]))
+        # Run without e_ops to store states
+        res = run_mesolve_with_states(H, psi0, tlist, c_ops)
+        n_c_vals = expect_from_states(res.states, c_op.dag() * c_op)
+        max_eff = float(np.max(n_c_vals))
 
-        # Fidelity
-        peak_idx = int(np.argmax(res.expect[0]))
+        # Fidelity at peak
+        peak_idx = int(np.argmax(n_c_vals))
         rho_c = res.states[peak_idx].ptrace(2)
         fidelity = float(qt.expect(target * target.dag(), rho_c))
 
-        # Added noise
+        # Added noise (vacuum input)
         res_vac = qt.mesolve(H, psi0_vac, tlist, c_ops=c_ops, e_ops=[c_op.dag() * c_op])
         n_add = float(np.max(res_vac.expect[0]))
 
-        # Qubit T1 degradation estimate:
-        # Extra thermal phonons leak backwards through the electromechanical coupling
-        # into the microwave cavity, inducing a decoherence rate ~ g_am^2 * n_th / gamma_b
-        gamma_induced = (g_am**2 * n_th) / (g_b / 2 + 1e-12) / (2 * np.pi)  # convert back from angular
+        # Qubit T1 degradation estimate
+        gamma_induced = (g_am**2 * n_th) / (g_b / 2 + 1e-12) / (2 * np.pi)
 
         results.append({
             "nThermal": round(float(n_th), 2),
