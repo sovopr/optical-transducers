@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  
+  --color-quantum-bg: #0b0f19;
+  --color-quantum-card: #151b2b;
+  --color-quantum-border: #232b40;
+  
+  --color-microwave: #3b82f6;
+  --color-mechanical: #10b981;
+  --color-optical: #ef4444;
+}
+
+body {
+  background-color: var(--color-quantum-bg);
+  color: #f1f5f9;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
