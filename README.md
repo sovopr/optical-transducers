@@ -36,9 +36,9 @@ The transducer couples three bosonic modes:
 
 | Mode | Operator | Physical Realization | Frequency |
 |------|----------|---------------------|-----------|
-| Microwave cavity | $\hat{a}$ | Superconducting LC resonator | ~5 GHz |
-| Mechanical resonator | $\hat{b}$ | Piezoelectric acoustic mode (e.g., LiNbO₃) | ~5 GHz |
-| Optical cavity | $\hat{c}$ | Fabry-Pérot or photonic crystal cavity | ~194 THz (1550 nm) |
+| Microwave cavity | â | Superconducting LC resonator | ~5 GHz |
+| Mechanical resonator | b̂ | Piezoelectric acoustic mode (e.g., LiNbO₃) | ~5 GHz |
+| Optical cavity | ĉ | Fabry-Pérot or photonic crystal cavity | ~194 THz (1550 nm) |
 
 ### Hamiltonian
 
@@ -50,11 +50,15 @@ Under strong coherent driving of both the microwave and optical cavities, and ap
 
 $$\hat{H}_{\text{int}} = \hbar g_{am}(\hat{a}^\dagger \hat{b} + \hat{a}\hat{b}^\dagger) + \hbar g_{mc}(\hat{b}^\dagger \hat{c} + \hat{b}\hat{c}^\dagger)$$
 
-where $g_{am} = g_0^{(am)} \sqrt{\bar{n}_a}$ and $g_{mc} = g_0^{(mc)} \sqrt{\bar{n}_c}$ are the enhanced coupling rates, proportional to the square root of the intracavity photon numbers of the respective pump fields.
+where the enhanced coupling rates are defined as:
+
+$$g_{am} = g_0^{(am)} \sqrt{\bar{n}_a} \qquad g_{mc} = g_0^{(mc)} \sqrt{\bar{n}_c}$$
+
+These are proportional to the square root of the intracavity photon numbers of the respective pump fields.
 
 ### Lindblad Master Equation
 
-The system is open: each mode couples to its own thermal bath. The density matrix $\rho$ evolves according to:
+The system is open: each mode couples to its own thermal bath. The density matrix evolves according to:
 
 $$\frac{d\rho}{dt} = -\frac{i}{\hbar}[\hat{H}_{\text{int}}, \rho] + \sum_k \mathcal{D}[\hat{L}_k]\rho$$
 
@@ -62,16 +66,21 @@ where the Lindblad dissipator is:
 
 $$\mathcal{D}[\hat{L}]\rho = \hat{L}\rho\hat{L}^\dagger - \frac{1}{2}\left(\hat{L}^\dagger\hat{L}\rho + \rho\hat{L}^\dagger\hat{L}\right)$$
 
-The collapse operators $\hat{L}_k$ encode both energy loss and thermal noise:
+The collapse operators encode both energy loss and thermal noise:
 
-| Collapse Operator | Process |
-|-------------------|---------|
-| $\sqrt{\kappa_a}\,\hat{a}$ | Microwave photon emission |
-| $\sqrt{\gamma_b(1 + \bar{n}_{\text{th}})}\,\hat{b}$ | Mechanical phonon emission (spontaneous + stimulated) |
-| $\sqrt{\gamma_b \bar{n}_{\text{th}}}\,\hat{b}^\dagger$ | Thermal phonon absorption from the bath |
-| $\sqrt{\kappa_c}\,\hat{c}$ | Optical photon emission |
+$$\hat{L}_1 = \sqrt{\kappa_a}\;\hat{a} \quad \text{(microwave photon emission)}$$
 
-Here $\bar{n}_{\text{th}} = [\exp(\hbar\omega_b / k_B T) - 1]^{-1}$ is the Bose-Einstein thermal occupation of the mechanical bath. Even at 15 mK, a 5 GHz mechanical mode has $\bar{n}_{\text{th}} \approx 0.01$, but laser-induced heating can raise the effective bath temperature dramatically [5].
+$$\hat{L}_2 = \sqrt{\gamma_b(1 + \bar{n}_{\text{th}})}\;\hat{b} \quad \text{(phonon emission: spontaneous + stimulated)}$$
+
+$$\hat{L}_3 = \sqrt{\gamma_b \bar{n}_{\text{th}}}\;\hat{b}^\dagger \quad \text{(thermal phonon absorption from bath)}$$
+
+$$\hat{L}_4 = \sqrt{\kappa_c}\;\hat{c} \quad \text{(optical photon emission)}$$
+
+The thermal occupation of the mechanical bath follows the Bose-Einstein distribution:
+
+$$\bar{n}_{\text{th}} = \left[\exp\left(\frac{\hbar\omega_b}{k_B T}\right) - 1\right]^{-1}$$
+
+Even at 15 mK, a 5 GHz mechanical mode has a small residual occupation of approximately 0.01 phonons, but laser-induced heating can raise the effective bath temperature dramatically [5].
 
 ### Monte Carlo Quantum Trajectories
 
@@ -91,7 +100,7 @@ $$\eta = \frac{\max_t \langle \hat{c}^\dagger\hat{c} \rangle(t)}{\langle \hat{a}
 
 $$\mathcal{F} = \langle 1_c | \hat{\rho}_c(t_{\text{peak}}) | 1_c \rangle$$
 
-where $\hat{\rho}_c = \text{Tr}_{a,b}[\hat{\rho}]$ is the reduced density matrix of the optical cavity, evaluated at the time of peak conversion.
+where the reduced density matrix of the optical cavity is obtained by tracing over the microwave and mechanical subsystems, evaluated at the time of peak conversion.
 
 **Added Noise Quanta:**
 
@@ -105,7 +114,7 @@ The Wigner function provides a complete phase-space representation of the quantu
 
 $$W(\alpha) = \frac{2}{\pi} \text{Tr}\left[\hat{D}^\dagger(\alpha)\hat{\rho}\hat{D}(\alpha)(-1)^{\hat{n}}\right]$$
 
-where $\hat{D}(\alpha)$ is the displacement operator. For a classical state (coherent, thermal), $W(\alpha) \geq 0$ everywhere. **Negative values of the Wigner function are a definitive signature of non-classicality** — they indicate the quantum nature of the transduced state has been preserved through the conversion [7].
+For a classical state (coherent, thermal), the Wigner function is non-negative everywhere. **Negative values of the Wigner function are a definitive signature of non-classicality** — they indicate the quantum nature of the transduced state has been preserved through the conversion [7].
 
 ### Thermal Backaction
 
